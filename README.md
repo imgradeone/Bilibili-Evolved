@@ -1,5 +1,9 @@
 <!-- spell-checker: disable -->
 
+该 Fork 提供增强版“关注时间显示”功能。
+
+---
+
 <div align="center"><img id="Bilibili-Evolved" width="500" alt="Bilibili Evolved" src="./images/bilibili-evolved-wide-color.svg"></div>
 <br>
 <div align="center">
