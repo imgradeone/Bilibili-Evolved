@@ -22,6 +22,11 @@ type FollowTimeInfo = {
   label: string
 }
 
+type RelationData = {
+  attribute?: number
+  mtime?: number
+}
+
 const midMap: Record<number, FollowTimeInfo> = {}
 
 const insertFollowTimeToCard = (mid: number, dateStr: string, label: string) => {
@@ -70,9 +75,15 @@ const updateCards = (() => {
   }
 })()
 
-const insertSubscribeTime = (followTimeStr: string, label: string) => {
+// 修改后：支持根据 key 防重，允许插入多行关系文本
+const insertSubscribeTime = (followTimeStr: string, label: string, key: string) => {
   const container = dq(SELECTORS.profileFollowContainer)
-  if (!container || container.querySelector(`.${SELECTORS.profileTextClass}`)) {
+  if (!container) {
+    return
+  }
+
+  // 使用 data 属性标记已插入的具体类型（如 data-time-key="be_relation"），避免重复插入
+  if (container.querySelector(`.${SELECTORS.profileTextClass}[data-time-key="${key}"]`)) {
     return
   }
 
@@ -82,6 +93,7 @@ const insertSubscribeTime = (followTimeStr: string, label: string) => {
 
   const infoEl = document.createElement('div')
   infoEl.className = SELECTORS.profileTextClass
+  infoEl.dataset.timeKey = key
   infoEl.textContent = `${label} ${followTimeStr}`
   container.appendChild(infoEl)
 }
@@ -136,6 +148,32 @@ if (!(unsafeWindow as any).subscribeTimeHooked) {
   })
 }
 
+const parseRelation = (relData?: RelationData, isPassive = false) => {
+  if (!relData || !relData.mtime) {
+    return null
+  }
+
+  const { attribute, mtime } = relData
+
+  if (attribute === 2 || attribute === 6) {
+    // 2 为普通关注，6 为互相关注
+    return {
+      mtime,
+      label: isPassive ? '被关注于' : '关注于',
+    }
+  }
+
+  if (attribute === 128) {
+    // 128 为拉黑关系
+    return {
+      mtime,
+      label: isPassive ? '被拉黑于' : '拉黑于',
+    }
+  }
+
+  return null
+}
+
 const entry = async () => {
   try {
     const { addImportantStyle } = await import('@/core/style')
@@ -163,32 +201,28 @@ const entry = async () => {
     getJsonWithCredentials(`https://api.bilibili.com/x/web-interface/relation?mid=${mid}`),
   )
 
-  const mtime = info?.relation?.mtime
-  const attribute = info?.relation?.attribute
+  // 1. 同时解析主动与被动关系
+  const activeRel = parseRelation(info?.relation, false)
+  const passiveRel = parseRelation(info?.be_relation, true)
 
-  // const be_mtime = info?.be_relation?.mtime
-  // const be_attribute = info?.be_relation?.attribute
+  const results = [
+    { key: 'relation', data: activeRel },
+    { key: 'be_relation', data: passiveRel },
+  ].filter(
+    (item): item is { key: string; data: NonNullable<typeof activeRel> } => item.data !== null,
+  )
 
-  if (!mtime) {
-    return
-  }
-
-  let label = ''
-
-  if (attribute === 2 || attribute === 6) {
-    // 2 为普通关注，6 为互相关注
-    label = '关注于'
-  } else if (attribute === 128) {
-    // 128 为拉黑关系
-    console.log('存在拉黑关系')
-    label = '拉黑于'
-  } else {
-    console.log('当前获取的是非关注/拉黑时间，跳过时间显示')
+  if (results.length === 0) {
+    console.log('当前未找到任何关注或拉黑关系，跳过时间显示')
     return
   }
 
   await select(SELECTORS.profileFollowContainer)
-  insertSubscribeTime(new Date(mtime * 1000).toLocaleString(), label)
+
+  // 2. 循环插入所有存在的关系时间
+  results.forEach(({ key, data }) => {
+    insertSubscribeTime(new Date(data.mtime * 1000).toLocaleString(), data.label, key)
+  })
 }
 
 export const component = defineComponentMetadata({
