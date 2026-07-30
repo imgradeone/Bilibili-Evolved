@@ -1,6 +1,6 @@
 <!-- spell-checker: disable -->
 
-该 Fork 提供增强版“关注时间显示”功能。
+该 Fork 提供增强版“关注时间显示”组件。
 
 ---
 
