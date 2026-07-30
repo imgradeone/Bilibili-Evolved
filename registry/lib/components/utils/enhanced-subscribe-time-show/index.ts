@@ -75,14 +75,12 @@ const updateCards = (() => {
   }
 })()
 
-// 修改后：支持根据 key 防重，允许插入多行关系文本
 const insertSubscribeTime = (followTimeStr: string, label: string, key: string) => {
   const container = dq(SELECTORS.profileFollowContainer)
   if (!container) {
     return
   }
 
-  // 使用 data 属性标记已插入的具体类型（如 data-time-key="be_relation"），避免重复插入
   if (container.querySelector(`.${SELECTORS.profileTextClass}[data-time-key="${key}"]`)) {
     return
   }
@@ -156,7 +154,6 @@ const parseRelation = (relData?: RelationData, isPassive = false) => {
   const { attribute, mtime } = relData
 
   if (attribute === 2 || attribute === 6) {
-    // 2 为普通关注，6 为互相关注
     return {
       mtime,
       label: isPassive ? '被关注于' : '关注于',
@@ -164,7 +161,6 @@ const parseRelation = (relData?: RelationData, isPassive = false) => {
   }
 
   if (attribute === 128) {
-    // 128 为拉黑关系
     return {
       mtime,
       label: isPassive ? '被拉黑于' : '拉黑于',
@@ -201,16 +197,20 @@ const entry = async () => {
     getJsonWithCredentials(`https://api.bilibili.com/x/web-interface/relation?mid=${mid}`),
   )
 
-  // 1. 同时解析主动与被动关系
   const activeRel = parseRelation(info?.relation, false)
   const passiveRel = parseRelation(info?.be_relation, true)
 
-  const results = [
-    { key: 'relation', data: activeRel },
-    { key: 'be_relation', data: passiveRel },
-  ].filter(
-    (item): item is { key: string; data: NonNullable<typeof activeRel> } => item.data !== null,
-  )
+  const results: { key: string; data: NonNullable<typeof activeRel> }[] = []
+
+  // 1. 只有主动关注或主动拉黑时才添加 relation
+  if (activeRel) {
+    results.push({ key: 'relation', data: activeRel })
+  }
+
+  // 2. 只有当对方也关注/拉黑了你（be_relation 有效）时才添加 be_relation
+  if (passiveRel) {
+    results.push({ key: 'be_relation', data: passiveRel })
+  }
 
   if (results.length === 0) {
     console.log('当前未找到任何关注或拉黑关系，跳过时间显示')
@@ -219,7 +219,13 @@ const entry = async () => {
 
   await select(SELECTORS.profileFollowContainer)
 
-  // 2. 循环插入所有存在的关系时间
+  // 渲染前清理历史元素，防止路由切换等残留
+  const container = dq(SELECTORS.profileFollowContainer)
+  if (container) {
+    container.querySelectorAll(`.${SELECTORS.profileTextClass}`).forEach(el => el.remove())
+  }
+
+  // 依次渲染有效关系
   results.forEach(({ key, data }) => {
     insertSubscribeTime(new Date(data.mtime * 1000).toLocaleString(), data.label, key)
   })
