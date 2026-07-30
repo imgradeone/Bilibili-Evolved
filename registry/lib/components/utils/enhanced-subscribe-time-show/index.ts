@@ -146,12 +146,22 @@ if (!(unsafeWindow as any).subscribeTimeHooked) {
   })
 }
 
-const parseRelation = (relData?: RelationData, isPassive = false) => {
+const parseRelation = (relData?: RelationData, isPassive = false, mainAttribute?: number) => {
   if (!relData || !relData.mtime) {
     return null
   }
 
   const { attribute, mtime } = relData
+
+  // 过滤无效状态：0 表示无关注/被关注关系
+  if (!attribute || attribute === 0) {
+    return null
+  }
+
+  // 校验被动关系：如果你只是单向关注对方 (mainAttribute === 2)，但对方没关注你，过滤错误的 be_relation
+  if (isPassive && mainAttribute === 2 && attribute !== 6) {
+    return null
+  }
 
   if (attribute === 2 || attribute === 6) {
     return {
@@ -197,19 +207,24 @@ const entry = async () => {
     getJsonWithCredentials(`https://api.bilibili.com/x/web-interface/relation?mid=${mid}`),
   )
 
+  const mainAttr = info?.relation?.attribute
+
   const activeRel = parseRelation(info?.relation, false)
-  const passiveRel = parseRelation(info?.be_relation, true)
+  const passiveRel = parseRelation(info?.be_relation, true, mainAttr)
 
   const results: { key: string; data: NonNullable<typeof activeRel> }[] = []
 
-  // 1. 只有主动关注或主动拉黑时才添加 relation
   if (activeRel) {
     results.push({ key: 'relation', data: activeRel })
   }
 
-  // 2. 只有当对方也关注/拉黑了你（be_relation 有效）时才添加 be_relation
   if (passiveRel) {
-    results.push({ key: 'be_relation', data: passiveRel })
+    const isDuplicate =
+      activeRel && activeRel.label === passiveRel.label && activeRel.mtime === passiveRel.mtime
+
+    if (!isDuplicate) {
+      results.push({ key: 'be_relation', data: passiveRel })
+    }
   }
 
   if (results.length === 0) {
@@ -219,13 +234,11 @@ const entry = async () => {
 
   await select(SELECTORS.profileFollowContainer)
 
-  // 渲染前清理历史元素，防止路由切换等残留
   const container = dq(SELECTORS.profileFollowContainer)
   if (container) {
     container.querySelectorAll(`.${SELECTORS.profileTextClass}`).forEach(el => el.remove())
   }
 
-  // 依次渲染有效关系
   results.forEach(({ key, data }) => {
     insertSubscribeTime(new Date(data.mtime * 1000).toLocaleString(), data.label, key)
   })
