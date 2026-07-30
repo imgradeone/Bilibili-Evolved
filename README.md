@@ -2,6 +2,8 @@
 
 该 Fork 提供增强版“关注时间显示”组件。
 
+https://raw.githubusercontent.com/imgradeone/Bilibili-Evolved/refs/heads/master/registry/dist/components/utils/enhanced-subscribe-time-show.js
+
 ---
 
 <div align="center"><img id="Bilibili-Evolved" width="500" alt="Bilibili Evolved" src="./images/bilibili-evolved-wide-color.svg"></div>
