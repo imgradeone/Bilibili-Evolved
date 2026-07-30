@@ -15,9 +15,14 @@
     font-weight: 500;
     text-shadow: 0 0 3px rgba(0, 0, 0, 0.7);
 
-    // 当出现第二个 subscribe-time-text 节点时，自动向上偏移一行（避免视觉重叠）
-    & + .subscribe-time-text {
-      top: -40px;
+    // 第一个节点（关注于 / 拉黑于）
+    &:first-of-type {
+      top: -20px;
+    }
+
+    // 第二个节点（被 Ta 关注于 / 被 Ta 拉黑于），强制向上偏移
+    &:nth-of-type(2) {
+      top: -38px !important;
     }
   }
 }
