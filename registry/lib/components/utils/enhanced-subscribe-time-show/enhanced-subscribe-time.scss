@@ -21,7 +21,7 @@
     }
 
     // 第二个节点（被 Ta 关注于 / 被 Ta 拉黑于），强制向上偏移
-    &:nth-of-type(2) {
+    &:nth-of-type(3) {
       top: -38px !important;
     }
   }
